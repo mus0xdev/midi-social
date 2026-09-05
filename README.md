@@ -1,3 +1,0 @@
-# midi-social
-
-coming soon
