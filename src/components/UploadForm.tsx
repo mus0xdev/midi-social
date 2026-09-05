@@ -5,6 +5,7 @@ import { CheckCircle2, UploadCloud } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
+import { GENRES } from "@/lib/genres";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MIDI_TYPES = new Set(["audio/midi", "audio/mid", "audio/x-midi", "application/octet-stream", ""]);
@@ -15,6 +16,7 @@ export function UploadForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
+  const [genre, setGenre] = useState("");
   const [tone, setTone] = useState("");
   const [license, setLicense] = useState("CC BY 4.0");
   const [error, setError] = useState("");
@@ -51,7 +53,7 @@ export function UploadForm() {
       description: description.trim() || null,
       filename: file.name.replace(/[<>"']/g, ""),
       storage_path: path,
-      tags: tags.split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean),
+      tags: [genre.toLowerCase(), ...tags.split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean)].filter(Boolean).filter((tag, index, values) => values.indexOf(tag) === index),
       tone: tone.trim() || null,
       license,
     });
@@ -73,9 +75,10 @@ export function UploadForm() {
     <label className="file-drop"><UploadCloud size={28} /><strong>{file ? file.name : "Drop your MIDI here"}</strong><span>{file ? `${(file.size / 1024).toFixed(0)} KB selected` : "or click to browse · .mid, .midi · max 10 MB"}</span><input type="file" accept=".mid,.midi,audio/midi" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>
     <label>Title<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Midnight Sketch" maxLength={120} /></label>
     <label>Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="What should listeners know?" maxLength={2000} /></label>
-    <div className="form-grid"><label>Tags<input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="jazz, piano, loop" /></label><label>Key<input value={tone} onChange={(event) => setTone(event.target.value)} placeholder="C major, A minor" maxLength={32} /></label></div>
+    <div className="form-grid"><label>Genre<select value={genre} onChange={(event) => setGenre(event.target.value)}><option value="">Select a genre</option>{GENRES.map((item) => <option key={item} value={item}>{item}</option>)}</select></label><label>Key<input value={tone} onChange={(event) => setTone(event.target.value)} placeholder="C major, A minor" maxLength={32} /></label></div>
+    <label>Tags<input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="piano, loop, cinematic" /></label>
     <p className="upload-policy">Only upload MIDI that you created, own, have permission to distribute, or that is genuinely Public Domain or licensed for redistribution.</p>
-    <label>License<select value={license} onChange={(event) => setLicense(event.target.value)}><option>Public domain</option><option>CC0</option><option>CC BY 4.0</option><option>CC BY-SA 4.0</option><option>All Rights Reserved</option></select></label>
+    <label>License<select value={license} onChange={(event) => setLicense(event.target.value)}><option>Public domain</option><option>CC0</option><option>CC BY 4.0</option><option>CC BY-SA 4.0</option><option>Creative Commons Attribution-ShareAlike 2.5</option><option>All Rights Reserved</option></select></label>
     {error && <p className="form-error">{error}</p>}
     <button className="primary-button" disabled={saving}>{saving ? "Publishing..." : "Publish MIDI"}</button>
   </form>;
