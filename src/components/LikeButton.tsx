@@ -1,0 +1,6 @@
+"use client";
+import { Heart } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/components/AuthProvider";
+export function LikeButton({ midiId }: { midiId: string }) { const { user } = useAuth(); const [liked, setLiked] = useState(false); const [count, setCount] = useState(0); useEffect(() => { supabase.from("likes").select("id", { count: "exact" }).eq("midi_id", midiId).then(({ count: total }) => setCount(total || 0)); if (user) supabase.from("likes").select("id").eq("midi_id", midiId).eq("user_id", user.id).maybeSingle().then(({ data }) => setLiked(Boolean(data))); }, [midiId, user]); async function toggle() { if (!user) return; if (liked) { await supabase.from("likes").delete().eq("midi_id", midiId).eq("user_id", user.id); setLiked(false); setCount((value) => value - 1); } else { await supabase.from("likes").insert({ midi_id: midiId, user_id: user.id }); setLiked(true); setCount((value) => value + 1); } } return <button className={`like-button ${liked ? "is-liked" : ""}`} onClick={() => void toggle()} title={user ? "Like" : "Log in to like"}><Heart size={17} fill={liked ? "currentColor" : "none"} /> {count}</button>; }

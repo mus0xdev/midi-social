@@ -1,0 +1,9 @@
+"use client";
+import { useEffect, useState } from "react";
+import { Navbar } from "@/components/Navbar";
+import { MidiCard } from "@/components/MidiCard";
+import { EmptyState, LoadingState } from "@/components/EmptyState";
+import { UserAvatar } from "@/components/UserAvatar";
+import { supabase } from "@/lib/supabase";
+import type { MidiFile, Profile } from "@/types/database";
+export default function UserPage({ params }: { params: Promise<{ username: string }> }) { const [profile, setProfile] = useState<Profile | null>(null); const [tracks, setTracks] = useState<MidiFile[]>([]); const [loading, setLoading] = useState(true); useEffect(() => { params.then(({ username }) => supabase.from("profiles").select("*").eq("username", decodeURIComponent(username)).single().then(async ({ data }) => { if (data) { setProfile(data as Profile); const result = await supabase.from("midi_files").select("*, profiles(username, avatar_url)").eq("user_id", (data as Profile).id).order("created_at", { ascending: false }); setTracks((result.data as MidiFile[]) || []); } setLoading(false); })); }, [params]); if (loading) return <><Navbar /><main className="content-shell"><LoadingState /></main></>; return <><Navbar /><main className="content-shell">{profile ? <><div className="profile-hero"><UserAvatar username={profile.username} avatarUrl={profile.avatar_url} size="lg" /><div><p className="eyebrow">CREATOR PROFILE</p><h1>@{profile.username}</h1><p>{profile.bio || "Making music, one note at a time."}</p><span>{tracks.length} MIDI files</span></div></div>{tracks.length ? <div className="track-grid">{tracks.map((midi) => <MidiCard key={midi.id} midi={midi} />)}</div> : <EmptyState />}</> : <EmptyState title="Profile not found" />}</main></>; }
