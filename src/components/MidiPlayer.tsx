@@ -17,8 +17,13 @@ export function MidiPlayer({ midi }: { midi: MidiFile }) {
   const playbackRef = useRef<PlaybackResources | null>(null);
   const durationRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const playCountedRef = useRef(false);
 
-  useEffect(() => () => stop(), []);
+  useEffect(() => {
+    playCountedRef.current = false;
+    stop();
+    return () => stop();
+  }, [midi.id]);
 
   function clearTimer() {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -41,6 +46,11 @@ export function MidiPlayer({ midi }: { midi: MidiFile }) {
     await Tone.start();
     toneRef.current = Tone;
     Tone.Destination.volume.value = volumeToDecibels(volume);
+
+    if (!playCountedRef.current) {
+      playCountedRef.current = true;
+      void supabase.rpc("increment_midi_plays", { midi_id: midi.id });
+    }
 
     if (playbackRef.current) {
       Tone.Transport.start();
@@ -90,6 +100,7 @@ export function MidiPlayer({ midi }: { midi: MidiFile }) {
     tone?.Transport.cancel();
     playbackRef.current?.dispose();
     playbackRef.current = null;
+    playCountedRef.current = false;
     setPlaying(false);
     setProgress(0);
     clearTimer();

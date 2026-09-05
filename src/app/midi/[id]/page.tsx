@@ -24,7 +24,6 @@ export default function MidiDetail({ params }: { params: Promise<{ id: string }>
       setId(value);
       supabase.from("midi_files").select("*, profiles(username, avatar_url)").eq("id", value).single().then(({ data }) => {
         setMidi(data as MidiFile);
-        if (data) void supabase.rpc("increment_midi_plays", { midi_id: value });
       });
     });
   }, [params]);
@@ -42,7 +41,7 @@ export default function MidiDetail({ params }: { params: Promise<{ id: string }>
         <Link href={`/user/${profile?.username}`}>@{profile?.username || "unknown"}</Link>
         <p>{midi.description || "No description added yet."}</p>
         <div className="detail-meta"><span><CalendarDays size={14} /> {formatDate(midi.created_at)}</span><span><Eye size={14} /> {formatCount(midi.plays)} plays</span><span><Download size={14} /> {formatCount(midi.downloads)} saves</span></div>
-        <div className="tag-row">{midi.tags?.map((tag) => <span className="tag" key={tag}>{tag}</span>)}</div>
+        <div className="tag-row">{midi.tags?.map((tag) => <Link href={`/search?tag=${encodeURIComponent(tag)}`} className="tag" key={tag}>{tag}</Link>)}</div>
       </div>
       <div className="detail-actions"><LikeButton midiId={id} /><DownloadButton midi={midi} /><ReportButton midiId={midi.id} /><DeleteMidiButton midi={midi} /></div>
     </div>
