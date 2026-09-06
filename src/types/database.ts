@@ -4,6 +4,12 @@ export type Profile = {
   avatar_url: string | null;
   bio: string | null;
   follower_count?: number;
+  banner_url?: string | null;
+  website_url?: string | null;
+  github_url?: string | null;
+  youtube_url?: string | null;
+  theme?: "forest" | "midnight" | "sunset" | "mono";
+  account_status?: "active" | "suspended" | "banned";
   created_at: string;
 };
 
@@ -43,6 +49,7 @@ export type Database = {
       likes: { Row: { id: string; midi_id: string; user_id: string; created_at: string }; Insert: { midi_id: string; user_id: string }; Update: never };
       reports: { Row: { id: string; reporter_id: string; midi_id: string | null; comment_id: string | null; reason: ReportReason; details: string | null; description: string | null; status: "open" | "reviewed" | "dismissed"; created_at: string }; Insert: { reporter_id: string; midi_id?: string; comment_id?: string; reason: ReportReason; details?: string | null; description?: string | null }; Update: { status?: "open" | "reviewed" | "dismissed" } };
     };
+    Functions: { delete_my_account: { Args: Record<string, never>; Returns: undefined }; is_active_user: { Args: Record<string, never>; Returns: boolean } };
   };
 };
 

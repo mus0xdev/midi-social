@@ -12,7 +12,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => { setUser(data.session?.user ?? null); setLoading(false); });
+    supabase.auth.getSession().then(async ({ data }) => {
+      const nextUser = data.session?.user ?? null;
+      if (nextUser) {
+        const { data: profile } = await supabase.from("profiles").select("account_status").eq("id", nextUser.id).single();
+        if (profile?.account_status && profile.account_status !== "active") await supabase.auth.signOut();
+        else setUser(nextUser);
+      }
+      setLoading(false);
+    });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user ?? null));
     return () => listener.subscription.unsubscribe();
   }, []);

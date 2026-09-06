@@ -88,7 +88,8 @@ export default function UserPage({ params }: { params: Promise<{ username: strin
     <main className="content-shell studio-shell">
       {profile ? (
         <>
-          <div className="studio-header">
+          <div className={`studio-header profile-theme-${profile.theme || "forest"}`}>
+            {profile.banner_url && <img className="profile-banner" src={profile.banner_url} alt="" />}
             <div className="profile-hero">
               <UserAvatar username={profile.username} avatarUrl={profile.avatar_url} size="lg" />
               <div>
@@ -96,6 +97,7 @@ export default function UserPage({ params }: { params: Promise<{ username: strin
                 <h1>@{profile.username}</h1>
                 <p>{profile.bio || "Making music, one note at a time."}</p>
                 <span>{tracks.length} MIDI files · {profile.follower_count || 0} followers</span>
+                <div className="profile-links">{profile.website_url && <a href={profile.website_url} target="_blank" rel="noreferrer">Website</a>}{profile.github_url && <a href={profile.github_url} target="_blank" rel="noreferrer">GitHub</a>}{profile.youtube_url && <a href={profile.youtube_url} target="_blank" rel="noreferrer">YouTube</a>}</div>
               </div>
             </div>
             {isOwner && (
