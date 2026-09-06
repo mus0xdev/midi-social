@@ -1,3 +1,5 @@
+export type ProfileLink = { label: string; url: string };
+
 export type Profile = {
   id: string;
   username: string;
@@ -8,6 +10,7 @@ export type Profile = {
   website_url?: string | null;
   github_url?: string | null;
   youtube_url?: string | null;
+  links?: ProfileLink[];
   theme?: "forest" | "midnight" | "sunset" | "mono";
   account_status?: "active" | "suspended" | "banned";
   created_at: string;

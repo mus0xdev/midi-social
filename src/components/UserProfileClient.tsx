@@ -99,20 +99,19 @@ export function UserProfileClient({ initialProfile, initialTracks }: Props) {
                 {tracks.length} MIDI files · {profile.follower_count ?? 0} followers
               </span>
               <div className="profile-links">
-                {profile.website_url && (
-                  <a href={profile.website_url} target="_blank" rel="noreferrer">
-                    Website
-                  </a>
-                )}
-                {profile.github_url && (
-                  <a href={profile.github_url} target="_blank" rel="noreferrer">
-                    GitHub
-                  </a>
-                )}
-                {profile.youtube_url && (
-                  <a href={profile.youtube_url} target="_blank" rel="noreferrer">
-                    YouTube
-                  </a>
+                {(profile.links && profile.links.length > 0
+                  ? profile.links
+                  : [
+                      profile.website_url ? { label: "Website", url: profile.website_url } : null,
+                      profile.github_url ? { label: "GitHub", url: profile.github_url } : null,
+                      profile.youtube_url ? { label: "YouTube", url: profile.youtube_url } : null,
+                    ].filter(Boolean)
+                ).map((link, i) =>
+                  link ? (
+                    <a key={i} href={link.url} target="_blank" rel="noreferrer">
+                      {link.label || link.url}
+                    </a>
+                  ) : null,
                 )}
               </div>
             </div>
