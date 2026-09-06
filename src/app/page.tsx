@@ -49,8 +49,11 @@ export default async function Home() {
             </p>
             <SearchBar large />
             <div className="hero-links">
+              <Link href="/explore">
+                Explore <ArrowUpRight size={15} />
+              </Link>
               <Link href="/new">
-                Explore newest <ArrowUpRight size={15} />
+                Newest <ArrowUpRight size={15} />
               </Link>
               <span>10 MB max · .mid &amp; .midi</span>
             </div>

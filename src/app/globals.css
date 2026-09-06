@@ -242,3 +242,6 @@ nav a:hover, .header-actions a:hover { color: #edf6ff; }
 .add-link-button { align-items: center; background: #15171a; border: 1px dashed #3a4044; border-radius: 4px; color: #7a8186; display: inline-flex; font-size: 12px; font-weight: 700; gap: 7px; padding: 10px 14px; transition: border-color .2s, color .2s; width: 100%; justify-content: center; }
 .add-link-button:hover { border-color: #62b8ff; color: #62b8ff; }
 @media (max-width: 560px) { .link-row { flex-wrap: wrap; } .link-label-input { flex: 1 1 100%; } .link-url-input { flex: 1 1 calc(100% - 50px); } }
+
+/* ---- Explore page ---- */
+.explore-section { margin-bottom: 48px; }
