@@ -1,275 +1,107 @@
-"use client";
-
-import Link from "next/link";
-import { BarChart3, Music4, UploadCloud } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { Navbar } from "@/components/Navbar";
-import { MidiCard } from "@/components/MidiCard";
-import { EmptyState, LoadingState } from "@/components/EmptyState";
-import { FollowButton } from "@/components/FollowButton";
-import { useAuth } from "@/components/AuthProvider";
-import { UserAvatar } from "@/components/UserAvatar";
-import { supabase } from "@/lib/supabase";
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { createServerClient } from "@/lib/supabase-server";
 import type { MidiFile, Profile } from "@/types/database";
+import { UserProfileClient } from "@/components/UserProfileClient";
 
-type StudioTab = "overview" | "uploads" | "analytics";
+// ---------------------------------------------------------------------------
+// Server-side data helpers
+// ---------------------------------------------------------------------------
 
-export default function UserPage({ params }: { params: Promise<{ username: string }> }) {
-  const { user, loading: authLoading } = useAuth();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [tracks, setTracks] = useState<MidiFile[]>([]);
-  const [followers, setFollowers] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<StudioTab>("overview");
-  const isOwner = Boolean(!authLoading && user && profile && user.id === profile.id);
+async function getProfile(username: string): Promise<Profile | null> {
+  try {
+    const supabase = createServerClient();
+    const { data } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("account_status", "active")
+      .eq("username", decodeURIComponent(username))
+      .single();
+    if (!data) return null;
+    // Fetch follower count in parallel — single query, count only
+    const { count } = await supabase
+      .from("profile_follows")
+      .select("id", { count: "exact", head: true })
+      .eq("profile_id", (data as Profile).id);
+    return { ...(data as Profile), follower_count: count ?? 0 };
+  } catch {
+    return null;
+  }
+}
 
-  useEffect(() => {
-    params.then(({ username }) =>
-      supabase
-        .from("profiles")
-        .select("*")
-        .eq("account_status", "active")
-        .eq("username", decodeURIComponent(username))
-        .single()
-        .then(async ({ data }) => {
-          if (data) {
-            const profileData = data as Profile;
-            const followerResult = await supabase
-              .from("profile_follows")
-              .select("id", { count: "exact", head: true })
-              .eq("profile_id", profileData.id);
-            setProfile({ ...profileData, follower_count: followerResult.count || 0 });
-            if (user?.id === profileData.id) {
-              const followerRows = await supabase.from("profile_follows").select("follower_id").eq("profile_id", profileData.id).order("created_at", { ascending: false });
-              const followerIds = (followerRows.data || []).map((row) => row.follower_id);
-              if (followerIds.length) {
-                const followerProfiles = await supabase.from("profiles").select("*").in("id", followerIds);
-                setFollowers((followerProfiles.data as Profile[]) || []);
-              }
-            }
-            const result = await supabase
-              .from("midi_files")
-              .select("*, profiles(username, avatar_url)")
-              .eq("user_id", (data as Profile).id)
-              .order("created_at", { ascending: false });
-            setTracks((result.data as MidiFile[]) || []);
-          }
-          setLoading(false);
-        }),
-    );
-  }, [params]);
+async function getPublicTracks(userId: string): Promise<MidiFile[]> {
+  try {
+    const supabase = createServerClient();
+    const { data } = await supabase
+      .from("midi_files")
+      .select("*, profiles(username, avatar_url)")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    return (data as MidiFile[]) ?? [];
+  } catch {
+    return [];
+  }
+}
 
-  const stats = useMemo(() => {
-    const totalPlays = tracks.reduce((sum, track) => sum + Number(track.plays || 0), 0);
-    const totalDownloads = tracks.reduce((sum, track) => sum + Number(track.downloads || 0), 0);
-    const avgPlays = tracks.length ? Math.round(totalPlays / tracks.length) : 0;
+// ---------------------------------------------------------------------------
+// generateMetadata — dynamic per-profile SEO
+// ---------------------------------------------------------------------------
 
-    const tagCounts: Record<string, number> = {};
-    tracks.forEach((track) => {
-      (track.tags || []).forEach((tag) => {
-        const normalizedTag = tag.toLowerCase();
-        tagCounts[normalizedTag] = (tagCounts[normalizedTag] || 0) + 1;
-      });
-    });
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}): Promise<Metadata> {
+  const { username } = await params;
+  const decoded = decodeURIComponent(username);
+  const profile = await getProfile(decoded);
 
-    const topTags = Object.entries(tagCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4)
-      .map(([tag, count]) => ({ tag, count }));
-
-    const bestTrack = [...tracks].sort((a, b) => Number(b.plays || 0) - Number(a.plays || 0))[0] || null;
-
-    return {
-      totalTracks: tracks.length,
-      totalPlays,
-      totalDownloads,
-      avgPlays,
-      topTags,
-      bestTrack,
-    };
-  }, [tracks]);
-
-  if (loading) {
-    return <><Navbar /><main className="content-shell"><LoadingState /></main></>;
+  if (!profile) {
+    return { title: "Profile not found | Midylo" };
   }
 
-  return <>
-    <Navbar />
-    <main className="content-shell studio-shell">
-      {profile ? (
-        <>
-          <div className={`studio-header profile-theme-${profile.theme || "forest"}`}>
-            {profile.banner_url && <img className="profile-banner" src={profile.banner_url} alt="" />}
-            <div className="profile-hero">
-              <UserAvatar username={profile.username} avatarUrl={profile.avatar_url} size="lg" />
-              <div>
-                {isOwner && <p className="eyebrow">CREATOR STUDIO</p>}
-                <h1>@{profile.username}</h1>
-                <p>{profile.bio || "Making music, one note at a time."}</p>
-                <span>{tracks.length} MIDI files · {profile.follower_count || 0} followers</span>
-                <div className="profile-links">{profile.website_url && <a href={profile.website_url} target="_blank" rel="noreferrer">Website</a>}{profile.github_url && <a href={profile.github_url} target="_blank" rel="noreferrer">GitHub</a>}{profile.youtube_url && <a href={profile.youtube_url} target="_blank" rel="noreferrer">YouTube</a>}</div>
-              </div>
-            </div>
-            {isOwner && (
-              <Link className="studio-upload-button" href="/upload">
-                <UploadCloud size={16} /> Upload MIDI
-              </Link>
-            )}
-            {!isOwner && <FollowButton profileId={profile.id} initialFollowerCount={profile.follower_count || 0} />}
-          </div>
+  const title = `@${profile.username} | Midylo`;
+  const description = profile.bio
+    ? `${profile.bio} — Explore MIDI shared by @${profile.username} on Midylo.`
+    : `Explore MIDI files shared by @${profile.username} on Midylo.`;
+  const url = `https://midylo.com/user/${encodeURIComponent(profile.username)}`;
 
-          {isOwner ? <>
-            <div className="studio-tabs" role="tablist" aria-label="Creator studio tabs">
-            <button className={activeTab === "overview" ? "studio-tab active" : "studio-tab"} onClick={() => setActiveTab("overview")} type="button">
-              <BarChart3 size={15} /> Overview
-            </button>
-            <button className={activeTab === "uploads" ? "studio-tab active" : "studio-tab"} onClick={() => setActiveTab("uploads")} type="button">
-              <Music4 size={15} /> Uploads
-            </button>
-            <button className={activeTab === "analytics" ? "studio-tab active" : "studio-tab"} onClick={() => setActiveTab("analytics")} type="button">
-              <BarChart3 size={15} /> Analytics
-            </button>
-            </div>
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description,
+      url,
+      type: "profile",
+    },
+  };
+}
 
-            {activeTab === "overview" && (
-            <>
-              <div className="studio-grid">
-                <div className="studio-card">
-                  <span>Total uploads</span>
-                  <strong>{stats.totalTracks}</strong>
-                  <small>{tracks.length ? "Active library" : "Ready for your first upload"}</small>
-                </div>
-                <div className="studio-card">
-                  <span>Followers</span>
-                  <strong>{profile.follower_count || 0}</strong>
-                  <small>People following your work</small>
-                </div>
-                <div className="studio-card">
-                  <span>Total plays</span>
-                  <strong>{stats.totalPlays}</strong>
-                  <small>{stats.bestTrack ? `Top: ${stats.bestTrack.title}` : "No plays yet"}</small>
-                </div>
-                <div className="studio-card">
-                  <span>Total downloads</span>
-                  <strong>{stats.totalDownloads}</strong>
-                  <small>{stats.avgPlays} avg. plays / track</small>
-                </div>
-                <div className="studio-card">
-                  <span>Top tag</span>
-                  {stats.topTags.length ? (
-                    <>
-                      <Link className="tag-link" href={`/search?tag=${encodeURIComponent(stats.topTags[0].tag)}`}>#{stats.topTags[0].tag}</Link>
-                      <small>{stats.topTags[0].count} tracks</small>
-                    </>
-                  ) : (
-                    <>
-                      <strong>—</strong>
-                      <small>No tags yet</small>
-                    </>
-                  )}
-                </div>
-              </div>
+// ---------------------------------------------------------------------------
+// Page — Server Component
+// ---------------------------------------------------------------------------
 
-              <div className="studio-panels">
-                <div className="studio-panel">
-                  <div className="panel-header">
-                    <h3>Top performers</h3>
-                  </div>
-                  {tracks.length ? (
-                    <ul className="rank-list">
-                      {[...tracks].sort((a, b) => Number(b.plays || 0) - Number(a.plays || 0)).slice(0, 4).map((track, index) => (
-                        <li key={track.id}>
-                          <span className="rank">#{index + 1}</span>
-                          <div>
-                            <strong>{track.title}</strong>
-                            <small>{track.plays || 0} plays</small>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="empty-mini">No uploads yet.</p>
-                  )}
-                </div>
+export default async function UserPage({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}) {
+  const { username } = await params;
+  const decoded = decodeURIComponent(username);
 
-                <div className="studio-panel">
-                  <div className="panel-header">
-                    <h3>Popular tags</h3>
-                  </div>
-                  {stats.topTags.length ? (
-                    <div className="tag-cloud">
-                      {stats.topTags.map(({ tag, count }) => (
-                        <Link key={tag} href={`/search?tag=${encodeURIComponent(tag)}`} className="tag-chip">#{tag} <span>{count}</span></Link>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="empty-mini">No tag activity yet.</p>
-                  )}
-                </div>
+  const profile = await getProfile(decoded);
+  if (!profile) notFound();
 
-                <div className="studio-panel">
-                  <div className="panel-header">
-                    <h3>Your followers</h3>
-                  </div>
-                  {followers.length ? (
-                    <ul className="follower-list">
-                      {followers.map((follower) => (
-                        <li key={follower.id}>
-                          <Link href={`/user/${encodeURIComponent(follower.username)}`}><UserAvatar username={follower.username} avatarUrl={follower.avatar_url} /></Link>
-                          <Link className="follower-name" href={`/user/${encodeURIComponent(follower.username)}`}>@{follower.username}</Link>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="empty-mini">No followers yet.</p>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
+  const tracks = await getPublicTracks(profile.id);
 
-            {activeTab === "uploads" && (
-            <div className="studio-content-block">
-              {tracks.length ? <div className="track-grid">{tracks.map((midi) => <MidiCard key={midi.id} midi={midi} />)}</div> : <EmptyState />}
-            </div>
-          )}
-
-            {activeTab === "analytics" && (
-            <div className="studio-content-block">
-              <div className="analytics-table">
-                <div className="analytics-head">
-                  <span>Track</span>
-                  <span>Plays</span>
-                  <span>Downloads</span>
-                  <span>Engagement</span>
-                </div>
-                {tracks.length ? (
-                  [...tracks].sort((a, b) => Number(b.plays || 0) - Number(a.plays || 0)).map((track) => {
-                    const engagement = Math.max(0, Math.round((Number(track.downloads || 0) / Math.max(Number(track.plays || 0), 1)) * 100));
-                    return (
-                      <div key={track.id} className="analytics-row">
-                        <span>{track.title}</span>
-                        <span>{track.plays || 0}</span>
-                        <span>{track.downloads || 0}</span>
-                        <span>{engagement}%</span>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="analytics-row empty-row"><span>No analytics yet.</span></div>
-                )}
-              </div>
-            </div>
-            )}
-          </> : (
-            <div className="studio-content-block">
-              {tracks.length ? <div className="track-grid">{tracks.map((midi) => <MidiCard key={midi.id} midi={midi} />)}</div> : <EmptyState />}
-            </div>
-          )}
-        </>
-      ) : (
-        <EmptyState title="Profile not found" />
-      )}
-    </main>
-  </>;
+  // Pass server-fetched data to the interactive Client Component
+  return (
+    <UserProfileClient
+      initialProfile={profile}
+      initialTracks={tracks}
+    />
+  );
 }

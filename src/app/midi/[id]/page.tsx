@@ -1,85 +1,131 @@
-"use client";
-
-import Link from "next/link";
-import { ArrowLeft, CalendarDays, Download, Eye } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Navbar } from "@/components/Navbar";
-import { MidiPlayer } from "@/components/MidiPlayer";
-import { LikeButton } from "@/components/LikeButton";
-import { DownloadButton } from "@/components/DownloadButton";
-import { DeleteMidiButton } from "@/components/DeleteMidiButton";
-import { ReportButton } from "@/components/ReportButton";
-import { CommentSection } from "@/components/CommentSection";
-import { LoadingState } from "@/components/EmptyState";
-import { MidiCard } from "@/components/MidiCard";
-import { useAuth } from "@/components/AuthProvider";
-import { supabase } from "@/lib/supabase";
-import { formatCount, formatDate } from "@/lib/format";
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { createServerClient } from "@/lib/supabase-server";
 import type { MidiFile } from "@/types/database";
+import { MidiDetailClient } from "@/components/MidiDetailClient";
 
-export default function MidiDetail({ params }: { params: Promise<{ id: string }> }) {
-  const { user } = useAuth();
-  const [midi, setMidi] = useState<MidiFile | null>(null);
-  const [id, setId] = useState("");
-  const [moreFromArtist, setMoreFromArtist] = useState<MidiFile[]>([]);
-  const [recommendations, setRecommendations] = useState<MidiFile[]>([]);
+// ---------------------------------------------------------------------------
+// Server-side data helpers
+// ---------------------------------------------------------------------------
 
-  useEffect(() => {
-    params.then(({ id: value }) => {
-      setId(value);
-      supabase.from("midi_files").select("*, profiles(username, avatar_url)").eq("id", value).single().then(async ({ data }) => {
-        const current = data as MidiFile;
-        setMidi(current);
-        if (!current) return;
+async function getMidi(id: string): Promise<MidiFile | null> {
+  try {
+    const supabase = createServerClient();
+    const { data } = await supabase
+      .from("midi_files")
+      .select("*, profiles(username, avatar_url)")
+      .eq("id", id)
+      .single();
+    return data ? (data as MidiFile) : null;
+  } catch {
+    return null;
+  }
+}
 
-        const [artistResult, candidateResult, likedResult, followedResult] = await Promise.all([
-          supabase.from("midi_files").select("*, profiles(username, avatar_url)").eq("user_id", current.user_id).neq("id", current.id).order("created_at", { ascending: false }).limit(4),
-          supabase.from("midi_files").select("*, profiles(username, avatar_url)").neq("id", current.id).order("created_at", { ascending: false }).limit(100),
-          user ? supabase.from("likes").select("midi_files(tags)").eq("user_id", user.id) : Promise.resolve({ data: [] }),
-          user ? supabase.from("profile_follows").select("profile_id").eq("follower_id", user.id) : Promise.resolve({ data: [] }),
-        ]);
-        const artistTracks = (artistResult.data as MidiFile[]) || [];
-        const candidates = (candidateResult.data as MidiFile[]) || [];
-        const likedRows = (likedResult.data || []) as Array<{ midi_files: { tags?: string[] } | Array<{ tags?: string[] }> | null }>;
-        const likedTags = likedRows.flatMap((like) => {
-          const related = like.midi_files;
-          return Array.isArray(related) ? related.flatMap((item) => item?.tags || []) : related?.tags || [];
-        }).map((tag) => tag.toLowerCase());
-        const followedIds = new Set((followedResult.data || []).map((follow) => follow.profile_id));
-        const artistIds = new Set(artistTracks.map((track) => track.id));
-        const ranked = candidates.filter((track) => !artistIds.has(track.id)).map((track, index) => {
-          const sharedTags = (track.tags || []).filter((tag) => likedTags.includes(tag.toLowerCase())).length;
-          const followsArtist = followedIds.has(track.user_id);
-          const popularity = Math.min(4, Number(track.plays || 0) / 25);
-          const freshness = Math.max(0, 2 - index / 30);
-          return { track, score: sharedTags * 6 + (followsArtist ? 10 : 0) + popularity + freshness };
-        }).sort((a, b) => b.score - a.score).slice(0, 4).map(({ track }) => track);
-        setMoreFromArtist(artistTracks);
-        setRecommendations(ranked);
-      });
-    });
-  }, [params, user]);
+async function getMoreFromArtist(userId: string, excludeId: string): Promise<MidiFile[]> {
+  try {
+    const supabase = createServerClient();
+    const { data } = await supabase
+      .from("midi_files")
+      .select("*, profiles(username, avatar_url)")
+      .eq("user_id", userId)
+      .neq("id", excludeId)
+      .order("created_at", { ascending: false })
+      .limit(4);
+    return (data as MidiFile[]) ?? [];
+  } catch {
+    return [];
+  }
+}
 
-  if (!midi) return <><Navbar /><main className="content-shell"><LoadingState /></main></>;
-  const profile = midi.profiles;
+async function getRelatedTracks(currentId: string, tags: string[]): Promise<MidiFile[]> {
+  try {
+    const supabase = createServerClient();
+    const { data } = await supabase
+      .from("midi_files")
+      .select("*, profiles(username, avatar_url)")
+      .neq("id", currentId)
+      .order("created_at", { ascending: false })
+      .limit(4);
+    if (!data) return [];
+    // Simple tag-based ranking — no N+1, single query
+    const tracks = data as MidiFile[];
+    if (!tags.length) return tracks.slice(0, 4);
+    const lowerTags = tags.map((t) => t.toLowerCase());
+    return [...tracks]
+      .map((track) => ({
+        track,
+        score: (track.tags || []).filter((t) => lowerTags.includes(t.toLowerCase())).length,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 4)
+      .map(({ track }) => track);
+  } catch {
+    return [];
+  }
+}
 
-  return <><Navbar /><main className="content-shell detail-shell">
-    <Link className="back-link" href="/"><ArrowLeft size={15} /> Back to library</Link>
-    <div className="detail-header">
-      <div className="detail-art">♪</div>
-      <div className="detail-copy">
-        <p className="eyebrow">MIDI FILE · {midi.license}{midi.tone ? ` · ${midi.tone}` : ""}</p>
-        <h1>{midi.title}</h1>
-        <Link href={`/user/${profile?.username}`}>@{profile?.username || "unknown"}</Link>
-        <p>{midi.description || "No description added yet."}</p>
-        <div className="detail-meta"><span><CalendarDays size={14} /> {formatDate(midi.created_at)}</span><span><Eye size={14} /> {formatCount(midi.plays)} plays</span><span><Download size={14} /> {formatCount(midi.downloads)} saves</span></div>
-        <div className="tag-row">{midi.tags?.map((tag) => <Link href={`/search?tag=${encodeURIComponent(tag)}`} className="tag" key={tag}>{tag}</Link>)}</div>
-      </div>
-      <div className="detail-actions"><LikeButton midiId={id} /><DownloadButton midi={midi} /><ReportButton midiId={midi.id} /><DeleteMidiButton midi={midi} /></div>
-    </div>
-    <MidiPlayer midi={midi} />
-    {moreFromArtist.length > 0 && <section className="recommendation-section"><div className="section-head"><div><p className="eyebrow">FROM THIS CREATOR</p><h2>More from @{profile?.username || "this artist"}</h2></div></div><div className="track-grid">{moreFromArtist.map((track) => <MidiCard key={track.id} midi={track} />)}</div></section>}
-    {recommendations.length > 0 && <section className="recommendation-section"><div className="section-head"><div><p className="eyebrow">FYP FOR YOU</p><h2>What you might like</h2></div><span className="recommendation-note">Based on your likes, follows and plays</span></div><div className="track-grid">{recommendations.map((track) => <MidiCard key={track.id} midi={track} />)}</div></section>}
-    <CommentSection midiId={id} />
-  </main></>;
+// ---------------------------------------------------------------------------
+// generateMetadata — dynamic per-MIDI SEO
+// ---------------------------------------------------------------------------
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const midi = await getMidi(id);
+
+  if (!midi) {
+    return { title: "MIDI not found | Midylo" };
+  }
+
+  const author = midi.profiles?.username ?? "unknown";
+  const title = `${midi.title} by @${author} | Midylo`;
+  const description = midi.description
+    ? `${midi.description.slice(0, 140)} — Shared by @${author} on Midylo.`
+    : `Listen to and explore "${midi.title}", shared by @${author} on Midylo.`;
+  const url = `https://midylo.com/midi/${midi.id}`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description,
+      url,
+      type: "music.song",
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Page — Server Component
+// ---------------------------------------------------------------------------
+
+export default async function MidiDetail({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
+  const midi = await getMidi(id);
+  if (!midi) notFound();
+
+  // Fetch supporting data in parallel — 2 queries, not N+1
+  const [moreFromArtist, related] = await Promise.all([
+    getMoreFromArtist(midi.user_id, midi.id),
+    getRelatedTracks(midi.id, midi.tags ?? []),
+  ]);
+
+  return (
+    <MidiDetailClient
+      initialMidi={midi}
+      initialMoreFromArtist={moreFromArtist}
+      initialRelated={related}
+    />
+  );
 }
