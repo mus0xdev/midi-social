@@ -18,6 +18,7 @@ export default function UserPage({ params }: { params: Promise<{ username: strin
   const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [tracks, setTracks] = useState<MidiFile[]>([]);
+  const [followers, setFollowers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<StudioTab>("overview");
   const isOwner = Boolean(!authLoading && user && profile && user.id === profile.id);
@@ -27,6 +28,7 @@ export default function UserPage({ params }: { params: Promise<{ username: strin
       supabase
         .from("profiles")
         .select("*")
+        .eq("account_status", "active")
         .eq("username", decodeURIComponent(username))
         .single()
         .then(async ({ data }) => {
@@ -37,6 +39,14 @@ export default function UserPage({ params }: { params: Promise<{ username: strin
               .select("id", { count: "exact", head: true })
               .eq("profile_id", profileData.id);
             setProfile({ ...profileData, follower_count: followerResult.count || 0 });
+            if (user?.id === profileData.id) {
+              const followerRows = await supabase.from("profile_follows").select("follower_id").eq("profile_id", profileData.id).order("created_at", { ascending: false });
+              const followerIds = (followerRows.data || []).map((row) => row.follower_id);
+              if (followerIds.length) {
+                const followerProfiles = await supabase.from("profiles").select("*").in("id", followerIds);
+                setFollowers((followerProfiles.data as Profile[]) || []);
+              }
+            }
             const result = await supabase
               .from("midi_files")
               .select("*, profiles(username, avatar_url)")
@@ -194,6 +204,24 @@ export default function UserPage({ params }: { params: Promise<{ username: strin
                     </div>
                   ) : (
                     <p className="empty-mini">No tag activity yet.</p>
+                  )}
+                </div>
+
+                <div className="studio-panel">
+                  <div className="panel-header">
+                    <h3>Your followers</h3>
+                  </div>
+                  {followers.length ? (
+                    <ul className="follower-list">
+                      {followers.map((follower) => (
+                        <li key={follower.id}>
+                          <Link href={`/user/${encodeURIComponent(follower.username)}`}><UserAvatar username={follower.username} avatarUrl={follower.avatar_url} /></Link>
+                          <Link className="follower-name" href={`/user/${encodeURIComponent(follower.username)}`}>@{follower.username}</Link>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="empty-mini">No followers yet.</p>
                   )}
                 </div>
               </div>

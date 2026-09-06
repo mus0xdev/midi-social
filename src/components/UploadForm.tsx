@@ -11,7 +11,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MIDI_TYPES = new Set(["audio/midi", "audio/mid", "audio/x-midi", "application/octet-stream", ""]);
 
 export function UploadForm() {
-  const { user } = useAuth();
+  const { user, restricted } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -27,6 +27,7 @@ export function UploadForm() {
     event.preventDefault();
     setError("");
     if (!user) return setError("Please log in first.");
+    if (restricted) return setError("Your account cannot upload while it is suspended or banned.");
     if (!file || !title.trim()) return setError("Choose a MIDI file and add a title.");
     if (!/\.(mid|midi)$/i.test(file.name) || (file.type !== "" && !MIDI_TYPES.has(file.type))) return setError("Only .mid and .midi files are accepted.");
     if (file.size > MAX_FILE_SIZE) return setError("The file must be smaller than 10 MB.");
@@ -80,6 +81,6 @@ export function UploadForm() {
     <p className="upload-policy">Only upload MIDI that you created, own, have permission to distribute, or that is genuinely Public Domain or licensed for redistribution.</p>
     <label>License<select value={license} onChange={(event) => setLicense(event.target.value)}><option>Public domain</option><option>CC0</option><option>CC BY 4.0</option><option>CC BY-SA 4.0</option><option>Creative Commons Attribution-ShareAlike 2.5</option><option>All Rights Reserved</option></select></label>
     {error && <p className="form-error">{error}</p>}
-    <button className="primary-button" disabled={saving}>{saving ? "Publishing..." : "Publish MIDI"}</button>
+    <button className="primary-button" disabled={saving || restricted}>{restricted ? "Upload unavailable" : saving ? "Publishing..." : "Publish MIDI"}</button>
   </form>;
 }

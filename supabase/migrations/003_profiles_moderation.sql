@@ -50,6 +50,8 @@ create policy "admins moderate profiles" on public.profiles for update to authen
   with check (exists (select 1 from public.profiles where id = auth.uid() and is_admin = true));
 
 -- Recreate write policies so suspended and banned users cannot create new activity.
+drop policy if exists "users create reports" on public.reports;
+create policy "users create reports" on public.reports for insert to authenticated with check (auth.uid() = reporter_id and public.is_active_user());
 drop policy if exists "users upload midi" on public.midi_files;
 create policy "users upload midi" on public.midi_files for insert to authenticated with check (auth.uid() = user_id and public.is_active_user());
 drop policy if exists "users manage own likes" on public.likes;

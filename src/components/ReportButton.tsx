@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import type { ReportReason } from "@/types/database";
 
 export function ReportButton({ midiId, commentId }: { midiId?: string; commentId?: string }) {
-  const { user } = useAuth();
+  const { user, restricted } = useAuth();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<ReportReason>("inappropriate");
   const [details, setDetails] = useState("");
@@ -15,7 +15,7 @@ export function ReportButton({ midiId, commentId }: { midiId?: string; commentId
   const targetId = midiId || commentId;
   const userId = user?.id;
 
-  if (!userId || !targetId) return null;
+  if (!userId || !targetId || restricted) return null;
 
   async function submit(event: FormEvent) {
     event.preventDefault();

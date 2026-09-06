@@ -6,7 +6,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 
 export function FollowButton({ profileId, initialFollowerCount = 0 }: { profileId: string; initialFollowerCount?: number }) {
-  const { user } = useAuth();
+  const { user, restricted } = useAuth();
   const [following, setFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(initialFollowerCount);
   const [pending, setPending] = useState(false);
@@ -20,6 +20,7 @@ export function FollowButton({ profileId, initialFollowerCount = 0 }: { profileI
   if (!user || user.id === profileId) return null;
 
   const toggleFollow = async () => {
+    if (restricted) return;
     setPending(true);
     setErrorMessage("");
     if (following) {
@@ -35,7 +36,7 @@ export function FollowButton({ profileId, initialFollowerCount = 0 }: { profileI
   };
 
   return <div className="follow-control">
-    <button className="follow-button" disabled={pending} onClick={toggleFollow} type="button">
+    <button className="follow-button" disabled={pending || restricted} onClick={toggleFollow} type="button">
       {following ? <UserRoundCheck size={15} /> : <UserPlus size={15} />}
       {following ? "Following" : "Follow"}
       <span>{followerCount}</span>

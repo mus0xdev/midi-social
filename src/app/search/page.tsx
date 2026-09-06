@@ -28,7 +28,7 @@ function SearchContent() {
 
     Promise.all([
       supabase.from("midi_files").select("*, profiles(username, avatar_url)").order("created_at", { ascending: false }).limit(100),
-      supabase.from("profiles").select("*").order("username", { ascending: true }).limit(100),
+      supabase.from("profiles").select("*").eq("account_status", "active").order("username", { ascending: true }).limit(100),
     ]).then(([tracksResult, profilesResult]) => {
       const foundTracks = ((tracksResult.data as MidiFile[]) || []).filter((item) => {
         const matchesQuery = !normalizedQuery || [item.title, item.description || "", item.profiles?.username || "", ...(item.tags || [])].some((value) => value.toLowerCase().includes(normalizedQuery));
