@@ -209,4 +209,6 @@ nav a:hover, .header-actions a:hover { color: #edf6ff; }
 .moderation-row { align-items: center; border-bottom: 1px solid #292f32; display: flex; justify-content: space-between; padding: 12px 14px; }
 .moderation-row:last-child { border-bottom: 0; }
 .moderation-row select { background: #202427; border: 1px solid #373c3f; color: #fff; padding: 7px; }
+.report-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.report-actions .danger-button { font-size: 11px; padding: 7px 9px; }
 @media (max-width: 760px) { .settings-layout { grid-template-columns: 1fr; }.profile-banner { height: 220px; } }

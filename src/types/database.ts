@@ -49,7 +49,7 @@ export type Database = {
       likes: { Row: { id: string; midi_id: string; user_id: string; created_at: string }; Insert: { midi_id: string; user_id: string }; Update: never };
       reports: { Row: { id: string; reporter_id: string; midi_id: string | null; comment_id: string | null; reason: ReportReason; details: string | null; description: string | null; status: "open" | "reviewed" | "dismissed"; created_at: string }; Insert: { reporter_id: string; midi_id?: string; comment_id?: string; reason: ReportReason; details?: string | null; description?: string | null }; Update: { status?: "open" | "reviewed" | "dismissed" } };
     };
-    Functions: { delete_my_account: { Args: Record<string, never>; Returns: undefined }; is_active_user: { Args: Record<string, never>; Returns: boolean } };
+    Functions: { delete_my_account: { Args: Record<string, never>; Returns: undefined }; is_active_user: { Args: Record<string, never>; Returns: boolean }; admin_delete_midi: { Args: { target_midi_id: string }; Returns: undefined } };
   };
 };
 
