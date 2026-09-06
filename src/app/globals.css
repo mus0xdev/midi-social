@@ -83,6 +83,7 @@ nav { display: flex; gap: 28px; margin-left: 12px; }nav a, .header-actions a { c
 .leaderboard-row:last-child { border-bottom: 0; }
 .leaderboard-row > strong { color: #e9c46a; font-size: 13px; }
 .leaderboard-avatar { align-items: center; background: #263b38; border-radius: 50%; color: #dfe9db; display: inline-flex; font-size: 13px; font-weight: 800; height: 34px; justify-content: center; width: 34px; }
+.leaderboard-row .avatar { justify-self: center; }
 .leaderboard-name { color: #eef1ed; font-size: 13px; font-weight: 800; min-width: 0; }
 .leaderboard-name small, .leaderboard-growth small { color: #8e9599; display: block; font-size: 10px; font-weight: 500; margin-top: 3px; }
 .leaderboard-growth { color: #a3c9a8; font-size: 14px; font-weight: 800; text-align: right; }
