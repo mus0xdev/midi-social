@@ -16,6 +16,6 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    sitemap: "https://midylo.com/sitemap.xml",
+    sitemap: "https://midylo.vercel.app/sitemap.xml",
   };
 }

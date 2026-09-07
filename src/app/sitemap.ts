@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { createServerClient } from "@/lib/supabase-server";
 
-const BASE_URL = "https://midylo.com";
+const BASE_URL = "https://midylo.vercel.app";
 
 // Sitemap revalidates once per day — avoids hammering the DB on every request
 export const revalidate = 86400;
